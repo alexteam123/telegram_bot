@@ -3,10 +3,9 @@ from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
 
 # ===== ЗАМЕНИТЕ ЭТИ ДВЕ СТРОЧКИ =====
-BOT_TOKEN = "8841305618:AAGAvmWazoEfLU-Mw9APHEGs-zbOp5t2qRU"
+BOT_TOKEN = "ВАШ_ТОКЕН_ОТ_BOTFATHER"
 ADMIN_ID = 7686890144
 
-# Этапы анкеты
 AGE, EXPERIENCE, PAST_SPHERE = range(3)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
