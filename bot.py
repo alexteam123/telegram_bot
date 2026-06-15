@@ -1,95 +1,70 @@
-import asyncio
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
+import telebot
+import time
 
 # ===== ЗАМЕНИТЕ ЭТИ ДВЕ СТРОЧКИ =====
 BOT_TOKEN = "8841305618:AAGAvmWazoEfLU-Mw9APHEGs-zbOp5t2qRU"
 ADMIN_ID = 7686890144
 
-AGE, EXPERIENCE, PAST_SPHERE = range(3)
+# Словарь для хранения ответов пользователей
+user_data = {}
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    username = f"@{user.username}" if user.username else "нет юзернейма"
-    user_id = user.id
+bot = telebot.TeleBot(BOT_TOKEN)
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    user_id = message.from_user.id
+    user_data[user_id] = {}
     
-    await context.bot.send_message(
-        chat_id=ADMIN_ID,
-        text=f"🔔 <b>Кто-то нажал /start!</b>\n\n"
-             f"👤 Имя: {user.first_name}\n"
-             f"📱 Юзернейм: {username}\n"
-             f"🆔 ID: {user_id}",
-        parse_mode="HTML"
-    )
+    # Отправляем уведомление админу
+    try:
+        bot.send_message(
+            ADMIN_ID,
+            f"🔔 <b>Кто-то нажал /start!</b>\n\n"
+            f"👤 Имя: {message.from_user.first_name}\n"
+            f"📱 Юзернейм: @{message.from_user.username if message.from_user.username else 'нет'}\n"
+            f"🆔 ID: {user_id}",
+            parse_mode="HTML"
+        )
+    except:
+        pass
     
-    await update.message.reply_text(
-        "📋 Здравствуйте! Ответьте на несколько вопросов.\n\n"
-        "1️⃣ Сколько вам лет?",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return AGE
+    bot.send_message(message.chat.id, "📋 Здравствуйте! Ответьте на несколько вопросов.\n\n1️⃣ Сколько вам лет?")
+    bot.register_next_step_handler(message, get_age)
 
-async def get_age(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['age'] = update.message.text
-    await update.message.reply_text(
-        "2️⃣ Имеете ли вы опыт работы с «лохматыми»?\n"
-        "(напишите да/нет или подробно)"
-    )
-    return EXPERIENCE
+def get_age(message):
+    user_id = message.from_user.id
+    user_data[user_id]['age'] = message.text
+    bot.send_message(message.chat.id, "2️⃣ Имеете ли вы опыт работы с «лохматыми»?\n(напишите да/нет или подробно)")
+    bot.register_next_step_handler(message, get_experience)
 
-async def get_experience(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['experience'] = update.message.text
-    await update.message.reply_text(
-        "3️⃣ Какая у вас была прошлая сфера работы? (если есть)\n"
-        "Если нет опыта, напишите «нет»"
-    )
-    return PAST_SPHERE
+def get_experience(message):
+    user_id = message.from_user.id
+    user_data[user_id]['experience'] = message.text
+    bot.send_message(message.chat.id, "3️⃣ Какая у вас была прошлая сфера работы? (если есть)\nЕсли нет опыта, напишите «нет»")
+    bot.register_next_step_handler(message, get_past_sphere)
 
-async def get_past_sphere(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['past_sphere'] = update.message.text
+def get_past_sphere(message):
+    user_id = message.from_user.id
+    user_data[user_id]['past_sphere'] = message.text
     
     text = f"""📬 <b>НОВАЯ АНКЕТА</b>
 
-1️⃣ Сколько вам лет: {context.user_data['age']}
+1️⃣ Сколько вам лет: {user_data[user_id]['age']}
 
-2️⃣ Опыт с «лохматыми»: {context.user_data['experience']}
+2️⃣ Опыт с «лохматыми»: {user_data[user_id]['experience']}
 
-3️⃣ Прошлая сфера: {context.user_data['past_sphere']}
+3️⃣ Прошлая сфера: {user_data[user_id]['past_sphere']}
 
 ━━━━━━━━━━━━━━━
-👤 От пользователя: @{update.effective_user.username if update.effective_user.username else 'нет юзернейма'}
-🆔 ID: {update.effective_user.id}"""
+👤 От пользователя: @{message.from_user.username if message.from_user.username else 'нет'}
+🆔 ID: {user_id}"""
     
-    await context.bot.send_message(chat_id=ADMIN_ID, text=text, parse_mode="HTML")
-    
-    await update.message.reply_text(
-        "✅ Спасибо! Ваша анкета отправлена.\n"
-        "Мы свяжемся с вами при необходимости.",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    
-    return ConversationHandler.END
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ Опрос отменён.", reply_markup=ReplyKeyboardRemove())
-    return ConversationHandler.END
-
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
-    
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_age)],
-            EXPERIENCE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_experience)],
-            PAST_SPHERE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_past_sphere)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)]
-    )
-    
-    app.add_handler(conv_handler)
-    print("🤖 Бот запущен и работает...")
-    app.run_polling()
+    try:
+        bot.send_message(ADMIN_ID, text, parse_mode="HTML")
+        bot.send_message(message.chat.id, "✅ Спасибо! Ваша анкета отправлена.")
+    except:
+        bot.send_message(message.chat.id, "✅ Спасибо! Ваша анкета сохранена.")
 
 if __name__ == "__main__":
-    main()
+    print("🤖 Бот запущен и работает...")
+    bot.infinity_polling()
